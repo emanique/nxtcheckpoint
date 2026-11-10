@@ -137,6 +137,23 @@ The approval worksheet starts with blank approver/evidence fields. The hash bind
 
 See [Canonical bridge technical guide](docs/CANONICAL_BRIDGE.md).
 
+### NSX DFW precedence diagnostics (read-only)
+
+The `sync_engine/precedence.py` module analyses DFW category precedence, policy/rule `sequence_number`, unsupported L2 categories, duplicate sequence positions, multi-domain ambiguity and scope-related uncertainty.
+
+The analysis produces *indicative* positions with `ORDER_FIELDS_VALID` or `UNVERIFIED` status, not Check Point rule insertion coordinates. `source_order_hash` binds the private rule review worksheet to sequence metadata, so a policy/rule reorder invalidates prior review evidence.
+
+```bash
+python -m sync_engine.approval_template \\
+  --input /secure/private/nsx-export.json \\
+  --inventory-file /secure/private/inventory/inventory.private.json \\
+  --output /secure/private/approvals.json
+```
+
+The canonical bridge retains the indicative ordering in **disabled candidates** and requires the exact source-order hash. **Even `ORDER_FIELDS_VALID` does not prove the effective NSX order, Check Point first-match equivalence, default rules, routing path or installation order.** Nothing in this feature writes to Check Point.
+
+See [DFW precedence diagnostics](docs/PRECEDENCE_ANALYSIS.md).
+
 ## Capability and maturity
 
 | Capability | Status | Behaviour |
@@ -154,6 +171,7 @@ See [Canonical bridge technical guide](docs/CANONICAL_BRIDGE.md).
 | Computed vs effective group reconciliation | Implemented for supported IPv4 groups | Detects exact set mismatches and blocks affected rules; not an atomic snapshot or enforcement proof |
 | Check Point object dry-run | Implemented, read-only | Deterministic CREATE/REUSE/CONFLICT plan, no writes |
 | Offline-to-canonical bridge | Implemented, read-only | Private hierarchical NSX export → reconciled disabled candidates → object dry-run; externally asserted approvals |
+| DFW precedence diagnostics | Implemented, read-only | Evaluates source category/sequence, ambiguity and collisions; source order hash invalidates prior approvals |
 | Check Point object/rule writes | Not implemented | No live staging |
 | Publish and install policy | Not implemented | No automatic enforcement |
 | Managed rollback / HA / drift remediation | Not implemented | Future work |
@@ -215,6 +233,7 @@ nxtcheckpoint/
 │   ├── GROUP_RECONCILIATION.md
 │   ├── OBJECT_DRY_RUN.md
 │   ├── CANONICAL_BRIDGE.md
+│   ├── PRECEDENCE_ANALYSIS.md
 │   ├── AUTOMATIZACAO_CONVERSAO.md
 │   └── GO_NO_GO.md
 ├── examples/approvals.example.json
@@ -225,7 +244,8 @@ nxtcheckpoint/
     ├── test_inventory.py
     ├── test_reconcile.py
     ├── test_object_plan.py
-    └── test_canonical_bridge.py
+    ├── test_canonical_bridge.py
+    └── test_precedence.py
 ```
 
 ## Quick start
@@ -440,7 +460,7 @@ Use least-privilege identities, trusted CAs, external secret management, audited
 | **v1.1** | Expanded compatibility matrix; fail-closed guards for excluded groups, schedules and TCP inspection semantics | Documentation and partial guards committed; verification pending |
 | **v1.2** | Offline hierarchical JSON importer, static IPv4 and TCP/UDP compatibility checks, pseudonymized reports | Implemented as read-only assessment; complete object conversion/deduplication still planned |
 | **v1.3** | Group expression, NSX VM/VIF identity collection, freshness and dynamic membership controls | Partial: expression resolver, read-only inventory and IPv4 membership comparison committed; atomic snapshots, drift attestation and enforcement not implemented |
-| **v1.4** | Unified canonical candidate with effective DFW order, scope, topology and shadow analysis | Partial: offline-to-candidate bridge implemented; effective ordering and path proof remain unimplemented |
+| **v1.4** | Unified canonical candidate with DFW ordering diagnostics, scope, topology and shadow analysis | Partial: indicative category/sequence analyzer and approval invalidation implemented; effective ordering, shadowing and path proof remain unimplemented |
 | **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Partial: read-only object dry-run committed; staging writer and rule writes not implemented |
 | **v1.6** | Authenticated approvals, publish/install separation, task tracking, HA tests, rollback and audit | Planned |
 
@@ -461,6 +481,7 @@ Use feature branches/PRs, synthetic test fixtures and tests for negative/unsuppo
 - [Computed vs effective group reconciliation](docs/GROUP_RECONCILIATION.md)
 - [Check Point object dry-run](docs/OBJECT_DRY_RUN.md)
 - [Offline NSX to canonical candidate bridge](docs/CANONICAL_BRIDGE.md)
+- [DFW precedence diagnostics](docs/PRECEDENCE_ANALYSIS.md)
 - [Semantic conversion and automation design](docs/AUTOMATIZACAO_CONVERSAO.md)
 - [Go/No-Go checklist](docs/GO_NO_GO.md)
 
