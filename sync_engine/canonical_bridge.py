@@ -14,6 +14,7 @@ from .candidate import ref_name
 from .group_logic import resolve_group_expression, UnsafeExpression
 from .inventory import load_private_inventory
 from .model import digest
+from .dependency_hash import semantic_rule_hash, DependencyHashError
 from .offline import assess, load_export, unwrap, service_compat
 from .object_plan import build_plan, PlanError
 
@@ -116,7 +117,11 @@ def compile_private_candidate(root, inventory, approvals=None):
             continue
         # The B label indicates only syntax eligibility. Approval must bind the
         # complete source rule payload and a documented gateway path review.
-        rule_hash = digest(rule)
+        try:
+            rule_hash = semantic_rule_hash(rule, groups, services, inventory["identity_map"])
+        except DependencyHashError as exc:
+            rejected.append({"anonymous_id": anon, "reasons": [str(exc)]})
+            continue
         approval = approvals.get(anon, {})
         if (approval.get("rule_hash") != rule_hash
                 or not approval.get("approver")
