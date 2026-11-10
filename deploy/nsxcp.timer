@@ -1,0 +1,9 @@
+[Unit]
+Description=Periodic NSX->Check Point synchronisation assessment
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=5min
+Persistent=true
+Unit=nsxcp.service
+[Install]
+WantedBy=timers.target
