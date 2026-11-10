@@ -1,0 +1,20 @@
+nsx:
+  url: https://nsx-manager.example.internal
+  username_env: NSX_USER
+  password_env: NSX_PASSWORD
+  ca_bundle: /etc/nsxcp/ca-nsx.pem
+  domains: [default]
+checkpoint:
+  url: https://checkpoint-management.example.internal
+  api_key_env: CP_API_KEY
+  ca_bundle: /etc/nsxcp/ca-checkpoint.pem
+  layer: NSX_MIGRATED_STAGING
+  management_domain: null
+sync:
+  interval_seconds: 300
+  state_dir: /var/lib/nsxcp
+  max_rules: 5000
+  max_change_percent: 15
+  allow_ips: []
+  approved_rule_prefix: NSXMIG_
+  approvals_file: /etc/nsxcp/approvals.json
