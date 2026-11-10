@@ -1,0 +1,7 @@
+{
+  "default/policy-id/rule-id": {
+    "hash": "sha256-from-latest-plan",
+    "topology_evidence": "CHG-1234: validated packet path and gateway traversal",
+    "approver": "Authorized change approver"
+  }
+}
