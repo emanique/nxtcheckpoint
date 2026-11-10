@@ -131,7 +131,7 @@ python -m sync_engine.object_plan \\
   --output /secure/private/object-plan-001
 ```
 
-The approval worksheet starts with blank approver/evidence fields. Filling those fields is an **external assertion**, not cryptographically enforced approval. Unsupported rules, stale/mismatched group membership, missing evidence or changed source rule hashes remain rejected. The current object planner refuses to process candidates with **any** rejected rules, so this is deliberately an all-or-nothing gate; bulk exports generally need an explicitly scoped cohort before object staging can be considered.
+The approval worksheet starts with blank approver/evidence fields. The hash binds the source rule **and its resolved group membership and referenced service definitions**, so changes to any of these inputs invalidate earlier approvals. Filling approval fields is an **external assertion**, not cryptographically enforced approval. Unsupported rules, stale/mismatched group membership, missing evidence or changed source rule hashes remain rejected. The current object planner refuses to process candidates with **any** rejected rules, so this is deliberately an all-or-nothing gate; bulk exports generally need an explicitly scoped cohort before object staging can be considered.
 
 **Critical limitations:** no validated effective NSX rule order, no atomic source snapshot guarantee, no demonstrated gateway enforcement for East-West traffic, no live staging writer, no `publish`/`install-policy`, no rollback. Candidate and object plan files contain sensitive configuration and must remain outside GitHub.
 
