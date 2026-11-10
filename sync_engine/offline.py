@@ -10,6 +10,7 @@ import ipaddress
 import json
 from pathlib import Path
 from .group_logic import resolve_group_expression, UnsafeExpression
+from .inventory import load_private_inventory
 
 KINDS = ("SecurityPolicy", "Rule", "Group", "Service")
 
@@ -195,11 +196,28 @@ def main():
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument(
+        "--inventory-file",
+        help="PRIVATE NSX inventory collected by sync_engine.inventory; enforces freshness",
+    )
+    parser.add_argument(
+        "--max-inventory-age-seconds", type=int, default=600,
+        help="Fail if the private inventory is older than this many seconds",
+    )
+    parser.add_argument(
         "--identity-map",
         help="PRIVATE JSON mapping from workload IDs to verified IPv4 address lists; never commit",
     )
     args = parser.parse_args()
     identity_map = None
+    if args.inventory_file and args.identity_map:
+        parser.error("Choose --inventory-file OR --identity-map")
+    if args.inventory_file:
+        if args.max_inventory_age_seconds <= 0 or args.max_inventory_age_seconds > 86400:
+            parser.error("Invalid inventory age limit")
+        data = load_private_inventory(
+            args.inventory_file, max_age_seconds=args.max_inventory_age_seconds
+        )
+        identity_map = data["identity_map"]
     if args.identity_map:
         identity_map = json.loads(Path(args.identity_map).read_text(encoding="utf-8"))
         if not isinstance(identity_map, dict):
