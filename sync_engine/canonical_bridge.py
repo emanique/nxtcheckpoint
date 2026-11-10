@@ -15,6 +15,7 @@ from .group_logic import resolve_group_expression, UnsafeExpression
 from .inventory import load_private_inventory
 from .model import digest
 from .dependency_hash import semantic_rule_hash, DependencyHashError
+from .precedence import analyze_precedence
 from .offline import assess, load_export, unwrap, service_compat
 from .object_plan import build_plan, PlanError
 
@@ -89,6 +90,8 @@ def compile_private_candidate(root, inventory, approvals=None):
         raise CanonicalError("verified_inventory_required")
     assessment = assess(root, inventory=inventory,
                         identity_map=inventory.get("identity_map"))
+    ordering = analyze_precedence(root)
+    position_by_id = {row["anonymous_id"]: row for row in ordering["rows"]}
     data = unwrap(root)
     groups = {obj["path"]: obj for obj in data["Group"] if obj.get("path")}
     services = {obj["path"]: obj for obj in data["Service"] if obj.get("path")}
@@ -126,7 +129,8 @@ def compile_private_candidate(root, inventory, approvals=None):
         if (approval.get("rule_hash") != rule_hash
                 or not approval.get("approver")
                 or not approval.get("topology_evidence")
-                or not approval.get("precedence_evidence")):
+                or not approval.get("precedence_evidence")
+                or approval.get("source_order_hash") != ordering["source_order_hash"]):
             rejected.append({"anonymous_id": anon,
                              "reasons": ["approval_or_topology_evidence_missing"]})
             continue
@@ -164,15 +168,18 @@ def compile_private_candidate(root, inventory, approvals=None):
             "enabled": False,
             "comments": "NXTCP-RULE:" + rule_hash[:32],
             "source_id": sid, "hash": rule_hash,
+            "indicative_source_position": position_by_id[anon]["indicative_position"],
+            "precedence_status": position_by_id[anon]["status"],
         })
     candidate = {
         "schema": "nxtcheckpoint.canonical-candidate.v1",
         "objects": [desired[k] for k in sorted(desired)],
-        "rules": sorted(rules, key=lambda r: r["source_id"]),
+        "rules": sorted(rules, key=lambda r: r["indicative_source_position"]),
         "rejected": rejected,
         "read_only": True,
         "enforcement_authorized": False,
         "reconciliation": assessment["reconciliation"],
+        "precedence": {k: v for k, v in ordering.items() if k != "rows"},
     }
     candidate["candidate_hash"] = digest({
         "objects": candidate["objects"], "rules": candidate["rules"]})
