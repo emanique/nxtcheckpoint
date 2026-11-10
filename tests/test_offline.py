@@ -12,7 +12,7 @@ def synthetic_export():
                           "ip_addresses": ["198.51.100.0/24"]}]}
     g2 = {"resource_type": "Group", "path": "/synthetic/groups/g2",
           "expression": [
-              {"resource_type": "ExternalIDExpression", "external_ids": ["fake-vm-001"]},
+              {"resource_type": "ExternalIDExpression", "member_type": "VirtualMachine", "external_ids": ["fake-vm-001"]},
               {"resource_type": "ConjunctionOperator", "conjunction_operator": "AND"},
               {"resource_type": "IPAddressExpression", "ip_addresses": ["198.51.100.8"]},
           ]}
