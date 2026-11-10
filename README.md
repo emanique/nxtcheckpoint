@@ -26,6 +26,29 @@ The importer was tested locally against a complex private NSX export **without u
 
 **Important integration boundary:** v1.2's offline export analyser is separate from the existing online API collector. It does not automatically create the online collector's `latest_plan.json` state or drive `candidate.py`. Read the [v1.2 offline import guide](docs/OFFLINE_EXPORT_V1_2.md) for precise capabilities and limitations.
 
+### Incremental group expression resolver
+
+The post-v1.2 group compiler (`sync_engine/group_logic.py`) now supports conservative IPv4 group evaluation, including static CIDR unions, `AND` intersections, recursive `PathExpression` references, and `ExternalIDExpression` **only when a verified private workload-to-IP map is supplied**. Unsupported conditions, unverified identity membership, invalid addresses, cyclic groups, mixed boolean precedence and empty intersections **fail closed**.
+
+Example with **synthetic documentation-only addresses**:
+
+```json
+{
+  "example-workload-id": ["192.0.2.21", "192.0.2.22"]
+}
+```
+
+```bash
+python -m sync_engine.offline \\
+  --input /secure/private/nsx-infra-export.json \\
+  --identity-map /secure/private/workload-identity-map.json \\
+  --output /secure/private/assessment
+```
+
+The mapping file is local and private. Group identities and resolved IPs are not written to the generated CSV/JSON assessment reports. **A caller-provided mapping is not an independently validated workload inventory**; production equivalence still requires identity freshness, full group membership verification, topology and Check Point rulebase checks. Current logic does not generate an enforceable target policy and has not been integration-tested against live appliance APIs.
+
+See the [offline import and group resolver guide](docs/OFFLINE_EXPORT_V1_2.md).
+
 ## Capability and maturity
 
 | Capability | Status | Behaviour |
@@ -38,6 +61,7 @@ The importer was tested locally against a complex private NSX export **without u
 | Offline candidate export | Implemented | Rule-level hash approval and topology evidence; rules disabled |
 | Periodic scheduling | Implemented | systemd service/timer, initially every 5 minutes |
 | Offline hierarchical Infra export importer | Implemented in v1.2 | UTF-8/UTF-16, Child* wrappers, pseudonymized reports; separate from online collector |
+| Conditional expression resolver | Implemented with safeguards | IPv4, AND/OR (homogeneous), path references, optional privately mapped workload IDs; not an inventory freshness guarantee |
 | Check Point object/rule writes | Not implemented | No live staging |
 | Publish and install policy | Not implemented | No automatic enforcement |
 | Managed rollback / HA / drift remediation | Not implemented | Future work |
@@ -100,7 +124,8 @@ nxtcheckpoint/
 ├── examples/approvals.example.json
 └── tests/
     ├── test_model.py
-    └── test_offline.py
+    ├── test_offline.py
+    └── test_group_logic.py
 ```
 
 ## Quick start
@@ -314,7 +339,7 @@ Use least-privilege identities, trusted CAs, external secret management, audited
 |---|---|---|
 | **v1.1** | Expanded compatibility matrix; fail-closed guards for excluded groups, schedules and TCP inspection semantics | Documentation and partial guards committed; verification pending |
 | **v1.2** | Offline hierarchical JSON importer, static IPv4 and TCP/UDP compatibility checks, pseudonymized reports | Implemented as read-only assessment; complete object conversion/deduplication still planned |
-| **v1.3** | Nested and dynamic group resolution, refresh policy, membership drift detection | Planned |
+| **v1.3** | Group expression and nested reference resolver; verified identity mapping, freshness and drift controls | Partial: expression resolver committed; live identity refresh and drift controls not implemented |
 | **v1.4** | DFW effective order, categories, direction, scope, topology and shadow analysis | Planned |
 | **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Planned |
 | **v1.6** | Authenticated approvals, publish/install separation, task tracking, HA tests, rollback and audit | Planned |
