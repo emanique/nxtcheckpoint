@@ -8,6 +8,7 @@ from pathlib import Path
 from .inventory import load_private_inventory
 from .model import digest
 from .dependency_hash import semantic_rule_hash
+from .precedence import analyze_precedence
 from .offline import load_export, unwrap, assess
 
 
@@ -24,6 +25,7 @@ def make_template(root, inventory):
             if key in rule_map:
                 raise ValueError("ambiguous_rule_identity")
             rule_map[key] = rule
+    ordering = analyze_precedence(root)
     result = {}
     for item in report["rules"]:
         if item["class"] != "B":
@@ -33,6 +35,7 @@ def make_template(root, inventory):
             raise ValueError("missing_rule_identity")
         result[key] = {
             "rule_hash": semantic_rule_hash(rule_map[key], groups, services, inventory["identity_map"]),
+            "source_order_hash": ordering["source_order_hash"],
             "approver": "",
             "topology_evidence": "",
             "precedence_evidence": "",
