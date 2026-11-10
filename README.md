@@ -267,4 +267,4 @@ Use feature branches/PRs, synthetic test fixtures and tests for negative/unsuppo
 
 ## License
 
-**No open-source license selected yet.** Public visibility does not grant unrestricted redistribution rights; add an explicit `LICENSE` before announcing license terms.
+This project is distributed under the **MIT License**. See the [LICENSE](LICENSE) file for the full license terms. Copyright (c) 2026 emanique.
