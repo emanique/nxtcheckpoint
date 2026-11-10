@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+config.local.yaml
+.env
+*.env
+credentials.env
+approvals.json
+latest_*.json
+last_good.json
+history/
+state/
+*.pem
+*.key
+*.p12
+*.pfx
