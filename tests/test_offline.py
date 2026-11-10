@@ -78,3 +78,18 @@ def test_invalid_l4_and_ipv6_group():
         {"resource_type": "ICMPTypeServiceEntry"}]})[0] == "C"
     assert group_compat({"expression": [
         {"resource_type": "IPAddressExpression", "ip_addresses": ["2001:db8::/64"]}]})[0] == "C"
+
+def test_identity_map_changes_group_resolution_without_exposing_identity(tmp_path):
+    source = synthetic_export()
+    resolved = assess(source, identity_map={"fake-vm-001": ["198.51.100.8"]})
+    assert resolved["groups"].get("resolved_identity_or_path", 0) == 1
+    write_report(resolved, tmp_path / "report")
+    output = (tmp_path / "report" / "summary.json").read_text() + (tmp_path / "report" / "rules.csv").read_text()
+    assert "fake-vm-001" not in output
+    assert "198.51.100.8" not in output
+
+
+def test_unverified_identity_stays_blocked():
+    result = assess(synthetic_export())
+    assert result["groups"].get("unresolved_workload_identity", 0) == 1
+    assert result["rule_classes"]["C"] == 1
