@@ -1,0 +1,21 @@
+[Unit]
+Description=NSX to Check Point guarded sync (read-only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=nsxcp
+Group=nsxcp
+EnvironmentFile=/etc/nsxcp/credentials.env
+WorkingDirectory=/opt/nsx-checkpoint-sync
+ExecStart=/opt/nsx-checkpoint-sync/.venv/bin/python -m sync_engine.cli --config /etc/nsxcp/config.yaml --check-checkpoint
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/nsxcp
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
