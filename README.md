@@ -263,6 +263,7 @@ Use feature branches/PRs, synthetic test fixtures and tests for negative/unsuppo
 - [Check Point Management API](https://sc1.checkpoint.com/documents/latest/APIs/)
 - [Detailed architecture](docs/ARQUITECTURA.md)
 - [Conversion matrix](docs/MATRIZ_CONVERSAO.csv)
+- [Semantic conversion and automation design](docs/AUTOMATIZACAO_CONVERSAO.md)
 - [Go/No-Go checklist](docs/GO_NO_GO.md)
 
 ## License
