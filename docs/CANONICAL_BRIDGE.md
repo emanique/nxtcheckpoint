@@ -31,22 +31,29 @@ python -m sync_engine.inventory \
   --output /secure/private/inventory-run-001
 ```
 
-### Step 2: optional private approvals
+### Step 2: generate a private, unapproved review worksheet
 
-The offline assessment can be used to obtain the **pseudonymous** `anonymous_id`; the private source rule's SHA-256 canonical hash must be calculated in a restricted environment. This is not an endorsement to supply fabricated approvals.
+```bash
+python -m sync_engine.approval_template \
+  --input /secure/private/nsx-export.json \
+  --inventory-file /secure/private/inventory-run-001/inventory.private.json \
+  --output /secure/private/approvals.json
+```
+
+The generated JSON is keyed by pseudonymous rule ID and contains the exact rule hash. **All approval and evidence fields are blank**. Generating this file grants no authorization. Only authorized change personnel should populate the fields after actual routing and precedence checks.
 
 ```json
 {
-  "example-pseudonymous-rule-id": {
-    "rule_hash": "exact-canonical-source-rule-hash",
-    "approver": "authorized-change-reviewer",
-    "topology_evidence": "documented-gateway-path-validation",
-    "precedence_evidence": "documented-effective-rule-order-validation"
+  "example-rule-id": {
+    "rule_hash": "sha256-of-private-rule",
+    "approver": "",
+    "topology_evidence": "",
+    "precedence_evidence": ""
   }
 }
 ```
 
-Store as `/secure/private/approvals.json`. Never commit it or use a public issue to collect approvals.
+These fields are **unverified textual assertions**, not digital signatures. A later release must connect them to a governed approval service.
 
 ### Step 3: canonical candidate from NSX Infra export
 
