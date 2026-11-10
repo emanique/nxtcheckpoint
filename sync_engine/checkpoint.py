@@ -53,3 +53,29 @@ class CheckPointClient:
 
     def publish(self):
         return self.call('publish')
+
+    def list_objects(self, kind):
+        """Read-only, fully paginated Management API inventory for one object kind."""
+        if kind not in ('host', 'network', 'group', 'service-tcp', 'service-udp'):
+            raise ValueError('Unsupported object kind')
+        offset = 0
+        objects = []
+        while True:
+            page = self.call('show-' + kind + 's', {
+                'offset': offset, 'limit': 100, 'details-level': 'full',
+            })
+            batch = page.get('objects')
+            total = page.get('total')
+            if not isinstance(batch, list) or not isinstance(total, int):
+                raise ValueError('Incomplete Check Point object inventory')
+            objects.extend(batch)
+            offset += len(batch)
+            if offset >= total:
+                return objects
+            if not batch:
+                raise ValueError('Incomplete Check Point pagination')
+
+    def object_inventory(self):
+        """Enumerate all relevant types; no writes and no partial fallback."""
+        return {kind: self.list_objects(kind)
+                for kind in ('host', 'network', 'group', 'service-tcp', 'service-udp')}
