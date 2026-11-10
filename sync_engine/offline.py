@@ -12,6 +12,7 @@ from pathlib import Path
 from .group_logic import resolve_group_expression, UnsafeExpression
 from .inventory import load_private_inventory
 from .reconcile import reconcile_catalog, summarize_reconciliation
+from .precedence import analyze_precedence
 
 KINDS = ("SecurityPolicy", "Rule", "Group", "Service")
 
@@ -171,6 +172,7 @@ def assess(root, identity_map=None, inventory=None):
         "source_format": "NSX Infra hierarchical export",
         "counts": {{"SecurityPolicy": "policies", "Rule": "rules", "Group": "groups", "Service": "services"}[k]: len(objects[k]) for k in KINDS},
         "groups": dict(collections.Counter(v[1] for v in groups.values())),
+        "precedence": {k: v for k, v in analyze_precedence(root).items() if k != "rows"},
         "reconciliation": summarize_reconciliation(reconciled) if reconciled is not None else {
             "status": "NOT_PERFORMED",
             "note": "No trusted point-in-time membership inventory supplied; no claim of group membership parity."
