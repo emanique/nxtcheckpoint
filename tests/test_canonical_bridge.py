@@ -6,6 +6,7 @@ from sync_engine.canonical_bridge import (
     CanonicalError, compile_private_candidate, save_private_candidate,
 )
 from sync_engine.model import digest
+from sync_engine.dependency_hash import semantic_rule_hash
 from sync_engine.offline import unwrap, assess
 from sync_engine.object_plan import build_plan
 from test_offline import synthetic_export
@@ -26,7 +27,7 @@ def approvals(root):
     assessment = assess(root, inventory=private_inventory(),
                         identity_map=private_inventory()["identity_map"])
     key = assessment["rules"][0]["anonymous_id"]
-    return {key: {"rule_hash": digest(rule), "approver": "synthetic-approver",
+    return {key: {"rule_hash": semantic_rule_hash(rule, {g["path"]: g for g in unwrap(root)["Group"]}, {s["path"]: s for s in unwrap(root)["Service"]}, private_inventory()["identity_map"]), "approver": "synthetic-approver",
                   "topology_evidence": "synthetic-routing-review",
                   "precedence_evidence": "synthetic-order-review"}}
 
@@ -112,8 +113,31 @@ def test_approval_template_never_grants_approval():
     mapping = make_template(root, private_inventory())
     assert len(mapping) == 1
     row = next(iter(mapping.values()))
-    assert row["rule_hash"] == digest(unwrap(root)["Rule"][0])
+    assert row["rule_hash"] == semantic_rule_hash(unwrap(root)["Rule"][0], {g["path"]: g for g in unwrap(root)["Group"]}, {s["path"]: s for s in unwrap(root)["Service"]}, private_inventory()["identity_map"])
     assert row["approver"] == ""
     assert row["topology_evidence"] == ""
     assert row["precedence_evidence"] == ""
     assert compile_private_candidate(root, private_inventory(), mapping)["rules"] == []
+
+def test_group_membership_change_invalidates_old_approval():
+    root = synthetic_export()
+    auth = approvals(root)
+    inventory = private_inventory()
+    # Change membership consistently in the group definition, identity map and
+    # realization: membership remains MATCH, but previously approved hash is stale.
+    g2 = next(g for g in unwrap(root)["Group"] if g["path"].endswith("/g2"))
+    g2["expression"][2]["ip_addresses"] = ["198.51.100.9"]
+    inventory["identity_map"]["fake-vm-001"] = ["198.51.100.9"]
+    inventory["effective_group_members"]["/synthetic/groups/g2"] = ["198.51.100.9"]
+    cand = compile_private_candidate(root, inventory, auth)
+    assert cand["rules"] == []
+    assert cand["rejected"][0]["reasons"] == ["approval_or_topology_evidence_missing"]
+
+
+def test_service_definition_change_invalidates_old_approval():
+    root = synthetic_export()
+    auth = approvals(root)
+    unwrap(root)["Service"][0]["service_entries"][0]["destination_ports"] = ["8443"]
+    cand = compile_private_candidate(root, private_inventory(), auth)
+    assert cand["rules"] == []
+    assert cand["rejected"][0]["reasons"] == ["approval_or_topology_evidence_missing"]
