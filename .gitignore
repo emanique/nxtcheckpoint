@@ -15,3 +15,10 @@ state/
 *.key
 *.p12
 *.pfx
+
+# Offline export assessment output (private and potentially correlatable)
+assessment/
+offline-reports/
+private-input/
+summary.json
+rules.csv
