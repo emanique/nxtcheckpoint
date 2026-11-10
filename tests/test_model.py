@@ -66,3 +66,18 @@ def test_scope_blocks():
     snap = fixture()
     snap['policies'][0]['scope'] = ['/g1']
     assert compile_snapshot(snap)['summary']['blocked'] == 1
+
+def test_exclusion_blocks():
+    snap = fixture()
+    snap['policies'][0]['rules'][0]['destinations_excluded'] = True
+    assert compile_snapshot(snap)['summary']['blocked'] == 1
+
+def test_schedule_blocks():
+    snap = fixture()
+    snap['policies'][0]['scheduler_path'] = '/infra/firewall-schedulers/maintenance'
+    assert compile_snapshot(snap)['summary']['blocked'] == 1
+
+def test_tcp_strict_blocks():
+    snap = fixture()
+    snap['policies'][0]['tcp_strict'] = False
+    assert compile_snapshot(snap)['summary']['blocked'] == 1
