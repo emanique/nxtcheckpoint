@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 from .group_logic import resolve_group_expression, UnsafeExpression
 from .inventory import load_private_inventory
+from .reconcile import reconcile_catalog, summarize_reconciliation
 
 KINDS = ("SecurityPolicy", "Rule", "Group", "Service")
 
@@ -96,7 +97,7 @@ def service_compat(service):
     return "A", "l4_tcp_udp"
 
 
-def assess(root, identity_map=None):
+def assess(root, identity_map=None, inventory=None):
     objects = unwrap(root)
     group_objects = {g["path"]: g for g in objects["Group"] if g.get("path")}
     groups = {}
@@ -109,6 +110,9 @@ def assess(root, identity_map=None):
             groups[path] = ("A", label)
         except UnsafeExpression as error:
             groups[path] = ("C", error.code)
+    reconciled = None
+    if inventory is not None:
+        reconciled = reconcile_catalog(objects["Group"], inventory)
     services = {s["path"]: service_compat(s) for s in objects["Service"] if s.get("path")}
     reasons = collections.Counter()
     rows = []
@@ -144,6 +148,8 @@ def assess(root, identity_map=None):
                         issues.add("unknown_group_reference")
                     elif groups[ref][0] != "A":
                         issues.add("complex_group_reference")
+                    elif reconciled is not None and reconciled[ref]["status"] != "MATCH":
+                        issues.add("group_membership_not_verified")
             for ref in rule.get("services", []):
                 if ref == "ANY":
                     continue
@@ -165,6 +171,10 @@ def assess(root, identity_map=None):
         "source_format": "NSX Infra hierarchical export",
         "counts": {{"SecurityPolicy": "policies", "Rule": "rules", "Group": "groups", "Service": "services"}[k]: len(objects[k]) for k in KINDS},
         "groups": dict(collections.Counter(v[1] for v in groups.values())),
+        "reconciliation": summarize_reconciliation(reconciled) if reconciled is not None else {
+            "status": "NOT_PERFORMED",
+            "note": "No trusted point-in-time membership inventory supplied; no claim of group membership parity."
+        },
         "services": dict(collections.Counter(v[1] for v in services.values())),
         "rule_classes": {k: classes.get(k, 0) for k in ("A", "B", "C")},
         "reason_counts": dict(sorted(reasons.items())),
@@ -209,6 +219,7 @@ def main():
     )
     args = parser.parse_args()
     identity_map = None
+    inventory = None
     if args.inventory_file and args.identity_map:
         parser.error("Choose --inventory-file OR --identity-map")
     if args.inventory_file:
@@ -218,11 +229,12 @@ def main():
             args.inventory_file, max_age_seconds=args.max_inventory_age_seconds
         )
         identity_map = data["identity_map"]
+        inventory = data
     if args.identity_map:
         identity_map = json.loads(Path(args.identity_map).read_text(encoding="utf-8"))
         if not isinstance(identity_map, dict):
             parser.error("--identity-map must contain a JSON object")
-    write_report(assess(load_export(args.input), identity_map=identity_map), args.output)
+    write_report(assess(load_export(args.input), identity_map=identity_map, inventory=inventory), args.output)
     print("Sanitized assessment written: summary.json, rules.csv")
 
 
