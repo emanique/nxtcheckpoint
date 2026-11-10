@@ -77,6 +77,7 @@ nxtcheckpoint/
 ├── docs/
 │   ├── ARQUITECTURA.md
 │   ├── MATRIZ_CONVERSAO.csv
+│   ├── AUTOMATIZACAO_CONVERSAO.md
 │   └── GO_NO_GO.md
 ├── examples/approvals.example.json
 └── tests/test_model.py
@@ -200,22 +201,65 @@ python -m sync_engine.candidate \
 
 The exporter rejects unsupported/changed/unapproved rules. Every accepted rule is output with `enabled: false`; **there is no Check Point API write**. Approval fields are checked for presence and hash equality, not cryptographic identity or evidence authenticity. An external change-management process must govern real approvals.
 
-## Rule conversion matrix
+## Rule compatibility and automated conversion
 
-| NSX element | Check Point representation | MVP |
+A complete, field-level compatibility matrix is maintained in [docs/MATRIZ_CONVERSAO.csv](docs/MATRIZ_CONVERSAO.csv), with target Check Point mapping, classification, current implementation status, automation strategy and safety gate. The proposed compiler, canonical schema and future API staging workflow are detailed in [docs/AUTOMATIZACAO_CONVERSAO.md](docs/AUTOMATIZACAO_CONVERSAO.md).
+
+### Compatibility levels
+
+| Level | Meaning | Enforcement rule |
 |---|---|---|
-| Simple static IPv4 address group | Host, network, group | Offline candidate |
-| TCP/UDP destination port | TCP/UDP service | Offline candidate |
-| ALLOW / DROP / REJECT | Accept / Drop / Reject | Mapped; traffic effect unverified |
-| Tags, dynamic or nested groups | Governed dynamic objects | Rejected |
-| Applied-To and scoped DFW | Gateway-specific policy scope | Rejected |
-| ANY scoped semantics | Requires topology review | Rejected |
-| Ethernet/L2 and stateless rules | No direct equivalence | Rejected |
-| Source-port constraints, security profiles | Extra semantics | Rejected |
-| NSX NAT / Gateway Firewall | NAT / policy rules | Out of scope |
-| Policy precedence and rule ordering | Check Point ordered rulebase | Recorded, not enforcement-validated |
+| **A — Direct syntax mapping** | Deterministic mapping of an object, action or field | **Not** permission for automatic installation; packet-path and rulebase checks still required |
+| **B — Conditional** | Translation depends on identity, direction, scope, rule order, dynamic membership or release-specific semantics | Reject until required evidence and implementation exist |
+| **C — Blocked** | No verified generic equivalent, unsupported semantics, or separate security capability | Manual redesign or a dedicated feature/module required |
 
-Generated candidate objects are **not** guaranteed to be ready-to-submit `add-access-rule` payloads. A future adapter must handle actual target objects, metadata, ownership, duplicates, collisions, rule positions and session transactions.
+### Key compatibility examples
+
+| NSX-T DFW element | Traditional Check Point Security Gateway | Class | Current MVP treatment |
+|---|---|---|---|
+| `ALLOW` / `DROP` | `Accept` / `Drop` | A | Action mapped; enforcement unverified |
+| `REJECT` | `Reject` | B | Tentative mapping only; packet-response validation required |
+| Static IPv4 group | Hosts, Networks and Groups | A | Simple `IPAddressExpression` supported |
+| Literal IPv4 / CIDR | Host / Network | A | CIDR as group member supported; direct rule operands not yet supported |
+| TCP / UDP destination port | TCP / UDP Service | A | Supported for simple L4 services |
+| ICMP type/code or source port filters | ICMP Service / specialised service configuration | B | Rejected pending dedicated converter |
+| Tag-driven dynamic or nested group | Reconciled dynamic objects or Groups | B | Rejected; membership reconciliation not implemented |
+| `ANY` | Any | B | Rejected pending scope and exposure review |
+| Negated source/destination | Negate match | B | Explicitly blocked pending semantic converter |
+| `IN` / `OUT` / `IN_OUT` | Source/Destination and gateway packet path | B | Only `IN_OUT` accepted as source input; packet-path proof still required |
+| `Applied-To` / scope | Gateway placement, topology and installation scope | B | Scoped rules rejected |
+| Schedule and `tcp_strict` | Time and stateful inspection configuration | B | Guarded/rejected pending equivalence testing |
+| DFW category/sequence and cleanup | Ordered Access Layer and cleanup policy | B | Basic sequence recorded; effective precedence not validated |
+| Ethernet/L2, stateless, L7 application entry | No generic direct Access Control equivalent | C | Rejected |
+| Distributed enforcement location | Gateway enforcement | C | Cannot be replicated by rule syntax alone |
+| Gateway Firewall / NAT / IPS | Separate firewall, NAT or Threat Prevention capabilities | B/C | Outside MVP |
+
+**Do not confuse mapping with enforcement:** a conventional Check Point Security Gateway sees only traffic routed through it. An NSX distributed rule that protects same-subnet East-West traffic does not become effective merely because its equivalent rule exists in Check Point.
+
+### Automated transformation pipeline
+
+```mermaid
+flowchart TD
+  A[NSX Policy API inventory] --> B[Normalize into canonical policy model]
+  B --> C[Resolve groups / services / identity]
+  C --> D{Semantic compatibility}
+  D -->|Unsupported| X[BLOCK / exceptions report]
+  D -->|A or B with evidence| E[Verify topology and effective rule order]
+  E -->|No proof| X
+  E --> F[Compute hash-bound delta and candidate]
+  F --> G[Generate OFFLINE disabled rule candidate]
+  G -. Planned only .-> H[Idempotent target staging session]
+  H -. Planned only .-> I[Independent change approval]
+  I -. Planned only .-> J[Publish / install / validate]
+```
+
+The implementation must keep stable NSX source IDs, separate source and target state, preserve precedence and explicit/implicit behavior, and never discard unsupported conditions silently. On incomplete inventory, configuration drift, stale approval, unexpected deletion, unsupported attributes, mismatched scope or threshold breaches, **fail closed**.
+
+### Illustrative conversion — NOT a current Check Point API write
+
+An NSX `ALLOW` rule from a static application group to a database group over TCP/443 can be represented as a **disabled** Check Point `Accept` candidate only after resolving its groups and service. The output must reference pre-created or matched objects, use an explicitly validated rule position, and include source ID, content hash and change evidence. A successful JSON candidate does not prove security equivalence.
+
+**Current release boundary:** collection, conservative normalization, delta reporting, guard checks and offline disabled-rule candidates are implemented. Rulebase-authoritative ordering, complete effective-policy inventory, dynamic group sync, target writes, publishing, installing, HA validation and rollback are **not** implemented. The extra negation/scheduling/TCP-strict guards have been committed; integration tests against real appliances and live enforcement have not been performed.
 
 ## Validation and Go/No-Go
 
@@ -244,14 +288,18 @@ Use least-privilege identities, trusted CAs, external secret management, audited
 | Zero approved candidates | Exceptions, matching hashes and required evidence |
 | Inactive scheduler | `systemctl list-timers`, service credentials and filesystem permissions |
 
-## Planned roadmap — NOT implemented
+## Roadmap — planned capabilities, not released
 
-1. Stronger NSX inventory completeness and advanced group semantics.
-2. Explicit traffic-path and effective policy equivalence analyzer.
-3. Idempotent Check Point management staging writer and ownership model.
-4. Authenticated approval workflow, audit and drift detection.
-5. Controlled publish/install, verification, HA-aware rollback.
-6. Versioned integration tests, supported compatibility matrix, dashboards and packages.
+| Proposed milestone | Deliverable | Status |
+|---|---|---|
+| **v1.1** | Expanded compatibility matrix; fail-closed guards for excluded groups, schedules and TCP inspection semantics | Documentation and partial guards committed; verification pending |
+| **v1.2** | Complete static IPv4 host/network/range and L4 service normalization, object deduplication, negative tests | Planned |
+| **v1.3** | Nested and dynamic group resolution, refresh policy, membership drift detection | Planned |
+| **v1.4** | DFW effective order, categories, direction, scope, topology and shadow analysis | Planned |
+| **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Planned |
+| **v1.6** | Authenticated approvals, publish/install separation, task tracking, HA tests, rollback and audit | Planned |
+
+Version labels above are **development targets**, not published releases or a compatibility certification. No stage may enable rules based solely on syntax conversion. A full test matrix, supported-version declaration and independent topology validation are prerequisites to an enforcement release.
 
 ## Contribution guidance
 
