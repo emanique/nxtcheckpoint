@@ -105,3 +105,15 @@ def test_unsupported_scope_does_not_produce_candidate():
     cand = compile_private_candidate(root, private_inventory(), approvals(root))
     assert cand["rules"] == []
     assert cand["rejected"]
+
+def test_approval_template_never_grants_approval():
+    from sync_engine.approval_template import make_template
+    root = synthetic_export()
+    mapping = make_template(root, private_inventory())
+    assert len(mapping) == 1
+    row = next(iter(mapping.values()))
+    assert row["rule_hash"] == digest(unwrap(root)["Rule"][0])
+    assert row["approver"] == ""
+    assert row["topology_evidence"] == ""
+    assert row["precedence_evidence"] == ""
+    assert compile_private_candidate(root, private_inventory(), mapping)["rules"] == []
