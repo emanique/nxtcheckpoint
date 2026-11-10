@@ -4,7 +4,7 @@ from sync_engine.reconcile import (
     reconcile_catalog, summarize_reconciliation,
 )
 from sync_engine.offline import assess, write_report
-from tests.test_offline import synthetic_export
+from test_offline import synthetic_export
 
 def group(path="/example/group", expr=None):
     return {
