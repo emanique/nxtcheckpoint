@@ -7,6 +7,7 @@ from sync_engine.canonical_bridge import (
 )
 from sync_engine.model import digest
 from sync_engine.dependency_hash import semantic_rule_hash
+from sync_engine.precedence import analyze_precedence
 from sync_engine.offline import unwrap, assess
 from sync_engine.object_plan import build_plan
 from test_offline import synthetic_export
@@ -28,6 +29,7 @@ def approvals(root):
                         identity_map=private_inventory()["identity_map"])
     key = assessment["rules"][0]["anonymous_id"]
     return {key: {"rule_hash": semantic_rule_hash(rule, {g["path"]: g for g in unwrap(root)["Group"]}, {s["path"]: s for s in unwrap(root)["Service"]}, private_inventory()["identity_map"]), "approver": "synthetic-approver",
+                  "source_order_hash": analyze_precedence(root)["source_order_hash"],
                   "topology_evidence": "synthetic-routing-review",
                   "precedence_evidence": "synthetic-order-review"}}
 
@@ -114,6 +116,7 @@ def test_approval_template_never_grants_approval():
     assert len(mapping) == 1
     row = next(iter(mapping.values()))
     assert row["rule_hash"] == semantic_rule_hash(unwrap(root)["Rule"][0], {g["path"]: g for g in unwrap(root)["Group"]}, {s["path"]: s for s in unwrap(root)["Service"]}, private_inventory()["identity_map"])
+    assert row["source_order_hash"] == analyze_precedence(root)["source_order_hash"]
     assert row["approver"] == ""
     assert row["topology_evidence"] == ""
     assert row["precedence_evidence"] == ""
@@ -141,3 +144,19 @@ def test_service_definition_change_invalidates_old_approval():
     cand = compile_private_candidate(root, private_inventory(), auth)
     assert cand["rules"] == []
     assert cand["rejected"][0]["reasons"] == ["approval_or_topology_evidence_missing"]
+
+def test_resequencing_invalidates_prior_rule_approval():
+    root = synthetic_export()
+    original = approvals(root)
+    policy = unwrap(root)["SecurityPolicy"][0]
+    policy["sequence_number"] = 20
+    cand = compile_private_candidate(root, private_inventory(), original)
+    assert cand["rules"] == []
+    assert cand["rejected"][0]["reasons"] == ["approval_or_topology_evidence_missing"]
+
+def test_candidate_reports_order_not_verified():
+    root = synthetic_export()
+    cand = compile_private_candidate(root, private_inventory(), approvals(root))
+    assert cand["precedence"]["effective_enforcement_verified"] is False
+    assert cand["precedence"]["target_install_order_authorized"] is False
+    assert cand["rules"][0]["precedence_status"] == "UNVERIFIED"
