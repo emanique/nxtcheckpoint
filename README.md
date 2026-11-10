@@ -84,6 +84,25 @@ The offline workflow remains **read-only** and **cannot generate live Check Poin
 
 See [Group membership reconciliation](docs/GROUP_RECONCILIATION.md).
 
+### Check Point object planning — read-only dry-run
+
+The new `sync_engine/object_plan.py` module translates the candidate's **static IPv4 hosts, networks, groups and TCP/UDP services** into a deterministic, *private* Check Point object plan without issuing write operations.
+
+The planner can load a complete private snapshot of existing Check Point objects or collect it through read-only Management API `show-*` calls. It marks each object as `CREATE`, `REUSE` or `CONFLICT`, using name/type comparison, semantic equality and a source-derived ownership marker. Conflicts block readiness for review; an all-clear object plan is **not** policy approval.
+
+```bash
+python -m sync_engine.object_plan \\
+  --candidate /secure/private/latest_candidate.json \\
+  --config /etc/nsxcp/config.yaml \\
+  --output /secure/private/dry-run-001
+```
+
+Alternatively pass `--target-snapshot /secure/private/checkpoint-objects.json` instead of `--config`. The detailed `object_plan.private.json` contains IPs and object data and must **never** enter the public repository. The CLI prints only counts and a plan hash.
+
+**Strict separation:** this consumes candidates produced by the existing online policy workflow; the hierarchical offline NSX exporter and reconciler are not yet connected to the same canonical candidate format. No staging write, publish, install-policy or rollback has been implemented.
+
+See [Object dry-run design and operation](docs/OBJECT_DRY_RUN.md).
+
 ## Capability and maturity
 
 | Capability | Status | Behaviour |
@@ -99,6 +118,7 @@ See [Group membership reconciliation](docs/GROUP_RECONCILIATION.md).
 | Conditional expression resolver | Implemented with safeguards | IPv4, AND/OR (homogeneous), path references, optional privately mapped workload IDs |
 | NSX workload identity inventory | Read-only prototype | VM/VIF collection and effective group member query; private data with freshness checks |
 | Computed vs effective group reconciliation | Implemented for supported IPv4 groups | Detects exact set mismatches and blocks affected rules; not an atomic snapshot or enforcement proof |
+| Check Point object dry-run | Implemented, read-only | Deterministic CREATE/REUSE/CONFLICT plan from online candidates, no writes |
 | Check Point object/rule writes | Not implemented | No live staging |
 | Publish and install policy | Not implemented | No automatic enforcement |
 | Managed rollback / HA / drift remediation | Not implemented | Future work |
@@ -158,6 +178,7 @@ nxtcheckpoint/
 │   ├── OFFLINE_EXPORT_V1_2.md
 │   ├── IDENTITY_INVENTORY.md
 │   ├── GROUP_RECONCILIATION.md
+│   ├── OBJECT_DRY_RUN.md
 │   ├── AUTOMATIZACAO_CONVERSAO.md
 │   └── GO_NO_GO.md
 ├── examples/approvals.example.json
@@ -166,7 +187,8 @@ nxtcheckpoint/
     ├── test_offline.py
     ├── test_group_logic.py
     ├── test_inventory.py
-    └── test_reconcile.py
+    ├── test_reconcile.py
+    └── test_object_plan.py
 ```
 
 ## Quick start
@@ -382,7 +404,7 @@ Use least-privilege identities, trusted CAs, external secret management, audited
 | **v1.2** | Offline hierarchical JSON importer, static IPv4 and TCP/UDP compatibility checks, pseudonymized reports | Implemented as read-only assessment; complete object conversion/deduplication still planned |
 | **v1.3** | Group expression, NSX VM/VIF identity collection, freshness and dynamic membership controls | Partial: expression resolver, read-only inventory and IPv4 membership comparison committed; atomic snapshots, drift attestation and enforcement not implemented |
 | **v1.4** | DFW effective order, categories, direction, scope, topology and shadow analysis | Planned |
-| **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Planned |
+| **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Partial: read-only object dry-run committed; staging writer and rule writes not implemented |
 | **v1.6** | Authenticated approvals, publish/install separation, task tracking, HA tests, rollback and audit | Planned |
 
 Version labels above are **development targets**, not published releases or a compatibility certification. No stage may enable rules based solely on syntax conversion. A full test matrix, supported-version declaration and independent topology validation are prerequisites to an enforcement release.
@@ -400,6 +422,7 @@ Use feature branches/PRs, synthetic test fixtures and tests for negative/unsuppo
 - [Offline hierarchical import (v1.2)](docs/OFFLINE_EXPORT_V1_2.md)
 - [Private NSX workload inventory](docs/IDENTITY_INVENTORY.md)
 - [Computed vs effective group reconciliation](docs/GROUP_RECONCILIATION.md)
+- [Check Point object dry-run](docs/OBJECT_DRY_RUN.md)
 - [Semantic conversion and automation design](docs/AUTOMATIZACAO_CONVERSAO.md)
 - [Go/No-Go checklist](docs/GO_NO_GO.md)
 
