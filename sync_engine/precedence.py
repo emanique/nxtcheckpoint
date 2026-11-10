@@ -134,7 +134,18 @@ def analyze_precedence(root):
         "unverified": counts["UNVERIFIED"],
         "reason_codes": dict(sorted(reasons.items())),
         "rows": output,
-        "source_order_hash": digest(output),
+        "source_order_hash": digest({
+            "rows": output,
+            "ordering_inputs": [{
+                "id": e["anonymous_id"],
+                "category": e["category"],
+                "policy_sequence": e["policy_sequence"],
+                "rule_sequence": e["rule_sequence"],
+                "policy_index": e["policy_index"],
+                "rule_index": e["rule_index"],
+                "domain": e["domain"],
+            } for e in entries],
+        }),
         "effective_enforcement_verified": False,
         "target_install_order_authorized": False,
     }
