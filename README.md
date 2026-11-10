@@ -69,6 +69,21 @@ The collector rejects duplicate VM/IP ownership, missing VIF provenance, orphan 
 
 Read the [identity inventory and data-protection guide](docs/IDENTITY_INVENTORY.md).
 
+### Effective group membership reconciliation (read-only)
+
+The new `sync_engine/reconcile.py` compares the **computed** membership of supported NSX IPv4 groups against **realized membership** returned by the NSX Policy API, using exact IPv4 subnet/range algebra without enumerating hosts.
+
+- `MATCH`: equal effective address sets at the collected snapshots; still requires time-consistency, rule-order and gateway routing checks.
+- `MISMATCH`: missing or extra addresses were detected. Only non-sensitive reason codes and block counts are reported.
+- `BLOCKED`: incomplete realized membership, unsupported expression, invalid address or unresolved workload identity.
+- `NOT_PERFORMED`: no private realized inventory was supplied; **not evidence of equivalence**.
+
+When using `--inventory-file`, the offline assessment now adds an anonymized reconciliation summary and marks referencing rules with `group_membership_not_verified` when their groups are not a match. The public project does not include private exports or reconciliation outputs.
+
+The offline workflow remains **read-only** and **cannot generate live Check Point policy changes**. Realized membership equality does not prove NSX DFW and a central Security Gateway have identical enforcement placement.
+
+See [Group membership reconciliation](docs/GROUP_RECONCILIATION.md).
+
 ## Capability and maturity
 
 | Capability | Status | Behaviour |
@@ -82,7 +97,8 @@ Read the [identity inventory and data-protection guide](docs/IDENTITY_INVENTORY.
 | Periodic scheduling | Implemented | systemd service/timer, initially every 5 minutes |
 | Offline hierarchical Infra export importer | Implemented in v1.2 | UTF-8/UTF-16, Child* wrappers, pseudonymized reports; separate from online collector |
 | Conditional expression resolver | Implemented with safeguards | IPv4, AND/OR (homogeneous), path references, optional privately mapped workload IDs |
-| NSX workload identity inventory | Read-only prototype | VM/VIF collection and effective group member query; private data with freshness checks, no complete membership attestation |
+| NSX workload identity inventory | Read-only prototype | VM/VIF collection and effective group member query; private data with freshness checks |
+| Computed vs effective group reconciliation | Implemented for supported IPv4 groups | Detects exact set mismatches and blocks affected rules; not an atomic snapshot or enforcement proof |
 | Check Point object/rule writes | Not implemented | No live staging |
 | Publish and install policy | Not implemented | No automatic enforcement |
 | Managed rollback / HA / drift remediation | Not implemented | Future work |
@@ -141,6 +157,7 @@ nxtcheckpoint/
 │   ├── MATRIZ_CONVERSAO.csv
 │   ├── OFFLINE_EXPORT_V1_2.md
 │   ├── IDENTITY_INVENTORY.md
+│   ├── GROUP_RECONCILIATION.md
 │   ├── AUTOMATIZACAO_CONVERSAO.md
 │   └── GO_NO_GO.md
 ├── examples/approvals.example.json
@@ -148,7 +165,8 @@ nxtcheckpoint/
     ├── test_model.py
     ├── test_offline.py
     ├── test_group_logic.py
-    └── test_inventory.py
+    ├── test_inventory.py
+    └── test_reconcile.py
 ```
 
 ## Quick start
@@ -362,7 +380,7 @@ Use least-privilege identities, trusted CAs, external secret management, audited
 |---|---|---|
 | **v1.1** | Expanded compatibility matrix; fail-closed guards for excluded groups, schedules and TCP inspection semantics | Documentation and partial guards committed; verification pending |
 | **v1.2** | Offline hierarchical JSON importer, static IPv4 and TCP/UDP compatibility checks, pseudonymized reports | Implemented as read-only assessment; complete object conversion/deduplication still planned |
-| **v1.3** | Group expression, NSX VM/VIF identity collection, freshness and dynamic membership controls | Partial: expression resolver and read-only inventory committed; live drift attestation, effective membership reconciliation and enforcement not implemented |
+| **v1.3** | Group expression, NSX VM/VIF identity collection, freshness and dynamic membership controls | Partial: expression resolver, read-only inventory and IPv4 membership comparison committed; atomic snapshots, drift attestation and enforcement not implemented |
 | **v1.4** | DFW effective order, categories, direction, scope, topology and shadow analysis | Planned |
 | **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Planned |
 | **v1.6** | Authenticated approvals, publish/install separation, task tracking, HA tests, rollback and audit | Planned |
@@ -381,6 +399,7 @@ Use feature branches/PRs, synthetic test fixtures and tests for negative/unsuppo
 - [Conversion matrix](docs/MATRIZ_CONVERSAO.csv)
 - [Offline hierarchical import (v1.2)](docs/OFFLINE_EXPORT_V1_2.md)
 - [Private NSX workload inventory](docs/IDENTITY_INVENTORY.md)
+- [Computed vs effective group reconciliation](docs/GROUP_RECONCILIATION.md)
 - [Semantic conversion and automation design](docs/AUTOMATIZACAO_CONVERSAO.md)
 - [Go/No-Go checklist](docs/GO_NO_GO.md)
 
