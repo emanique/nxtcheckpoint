@@ -103,6 +103,40 @@ Alternatively pass `--target-snapshot /secure/private/checkpoint-objects.json` i
 
 See [Object dry-run design and operation](docs/OBJECT_DRY_RUN.md).
 
+### Canonical bridge — private NSX export to Check Point dry-run
+
+The new `sync_engine/canonical_bridge.py` connects the previously separate offline NSX Infra assessment and effective membership reconciliation to the same candidate format consumed by the Check Point object planner. It creates **only private disabled-rule candidates**, never live Check Point changes.
+
+```bash
+# 1. Create an unapproved, private worksheet with rule hashes
+python -m sync_engine.approval_template \\
+  --input /secure/private/nsx-export.json \\
+  --inventory-file /secure/private/inventory-run-001/inventory.private.json \\
+  --output /secure/private/approvals.json
+
+# 2. An authorized reviewer must supply real topology and precedence evidence
+#    and approve only suitable rules outside the tool.
+
+# 3. Produce a private disabled candidate (no API writes)
+python -m sync_engine.canonical_bridge \\
+  --input /secure/private/nsx-export.json \\
+  --inventory-file /secure/private/inventory-run-001/inventory.private.json \\
+  --approvals /secure/private/approvals.json \\
+  --output /secure/private/canonical-001
+
+# 4. Generate object CREATE / REUSE / CONFLICT decisions read-only
+python -m sync_engine.object_plan \\
+  --candidate /secure/private/canonical-001/canonical_candidate.private.json \\
+  --config /etc/nsxcp/config.yaml \\
+  --output /secure/private/object-plan-001
+```
+
+The approval worksheet starts with blank approver/evidence fields. Filling those fields is an **external assertion**, not cryptographically enforced approval. Unsupported rules, stale/mismatched group membership, missing evidence or changed source rule hashes remain rejected. The current object planner refuses to process candidates with **any** rejected rules, so this is deliberately an all-or-nothing gate; bulk exports generally need an explicitly scoped cohort before object staging can be considered.
+
+**Critical limitations:** no validated effective NSX rule order, no atomic source snapshot guarantee, no demonstrated gateway enforcement for East-West traffic, no live staging writer, no `publish`/`install-policy`, no rollback. Candidate and object plan files contain sensitive configuration and must remain outside GitHub.
+
+See [Canonical bridge technical guide](docs/CANONICAL_BRIDGE.md).
+
 ## Capability and maturity
 
 | Capability | Status | Behaviour |
@@ -118,7 +152,8 @@ See [Object dry-run design and operation](docs/OBJECT_DRY_RUN.md).
 | Conditional expression resolver | Implemented with safeguards | IPv4, AND/OR (homogeneous), path references, optional privately mapped workload IDs |
 | NSX workload identity inventory | Read-only prototype | VM/VIF collection and effective group member query; private data with freshness checks |
 | Computed vs effective group reconciliation | Implemented for supported IPv4 groups | Detects exact set mismatches and blocks affected rules; not an atomic snapshot or enforcement proof |
-| Check Point object dry-run | Implemented, read-only | Deterministic CREATE/REUSE/CONFLICT plan from online candidates, no writes |
+| Check Point object dry-run | Implemented, read-only | Deterministic CREATE/REUSE/CONFLICT plan, no writes |
+| Offline-to-canonical bridge | Implemented, read-only | Private hierarchical NSX export → reconciled disabled candidates → object dry-run; externally asserted approvals |
 | Check Point object/rule writes | Not implemented | No live staging |
 | Publish and install policy | Not implemented | No automatic enforcement |
 | Managed rollback / HA / drift remediation | Not implemented | Future work |
@@ -179,6 +214,7 @@ nxtcheckpoint/
 │   ├── IDENTITY_INVENTORY.md
 │   ├── GROUP_RECONCILIATION.md
 │   ├── OBJECT_DRY_RUN.md
+│   ├── CANONICAL_BRIDGE.md
 │   ├── AUTOMATIZACAO_CONVERSAO.md
 │   └── GO_NO_GO.md
 ├── examples/approvals.example.json
@@ -188,7 +224,8 @@ nxtcheckpoint/
     ├── test_group_logic.py
     ├── test_inventory.py
     ├── test_reconcile.py
-    └── test_object_plan.py
+    ├── test_object_plan.py
+    └── test_canonical_bridge.py
 ```
 
 ## Quick start
@@ -403,7 +440,7 @@ Use least-privilege identities, trusted CAs, external secret management, audited
 | **v1.1** | Expanded compatibility matrix; fail-closed guards for excluded groups, schedules and TCP inspection semantics | Documentation and partial guards committed; verification pending |
 | **v1.2** | Offline hierarchical JSON importer, static IPv4 and TCP/UDP compatibility checks, pseudonymized reports | Implemented as read-only assessment; complete object conversion/deduplication still planned |
 | **v1.3** | Group expression, NSX VM/VIF identity collection, freshness and dynamic membership controls | Partial: expression resolver, read-only inventory and IPv4 membership comparison committed; atomic snapshots, drift attestation and enforcement not implemented |
-| **v1.4** | DFW effective order, categories, direction, scope, topology and shadow analysis | Planned |
+| **v1.4** | Unified canonical candidate with effective DFW order, scope, topology and shadow analysis | Partial: offline-to-candidate bridge implemented; effective ordering and path proof remain unimplemented |
 | **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Partial: read-only object dry-run committed; staging writer and rule writes not implemented |
 | **v1.6** | Authenticated approvals, publish/install separation, task tracking, HA tests, rollback and audit | Planned |
 
@@ -423,6 +460,7 @@ Use feature branches/PRs, synthetic test fixtures and tests for negative/unsuppo
 - [Private NSX workload inventory](docs/IDENTITY_INVENTORY.md)
 - [Computed vs effective group reconciliation](docs/GROUP_RECONCILIATION.md)
 - [Check Point object dry-run](docs/OBJECT_DRY_RUN.md)
+- [Offline NSX to canonical candidate bridge](docs/CANONICAL_BRIDGE.md)
 - [Semantic conversion and automation design](docs/AUTOMATIZACAO_CONVERSAO.md)
 - [Go/No-Go checklist](docs/GO_NO_GO.md)
 
