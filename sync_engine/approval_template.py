@@ -7,13 +7,17 @@ from pathlib import Path
 
 from .inventory import load_private_inventory
 from .model import digest
+from .dependency_hash import semantic_rule_hash
 from .offline import load_export, unwrap, assess
 
 
 def make_template(root, inventory):
     report = assess(root, inventory=inventory, identity_map=inventory["identity_map"])
+    objects = unwrap(root)
+    groups = {o["path"]: o for o in objects["Group"] if o.get("path")}
+    services = {o["path"]: o for o in objects["Service"] if o.get("path")}
     rule_map = {}
-    for rule in unwrap(root)["Rule"]:
+    for rule in objects["Rule"]:
         path = rule.get("path")
         if path:
             key = hashlib.sha256(str(path).encode()).hexdigest()[:16]
@@ -28,7 +32,7 @@ def make_template(root, inventory):
         if key not in rule_map:
             raise ValueError("missing_rule_identity")
         result[key] = {
-            "rule_hash": digest(rule_map[key]),
+            "rule_hash": semantic_rule_hash(rule_map[key], groups, services, inventory["identity_map"]),
             "approver": "",
             "topology_evidence": "",
             "precedence_evidence": "",
