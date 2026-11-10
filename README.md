@@ -49,6 +49,26 @@ The mapping file is local and private. Group identities and resolved IPs are not
 
 See the [offline import and group resolver guide](docs/OFFLINE_EXPORT_V1_2.md).
 
+### Read-only NSX workload inventory (incremental development)
+
+The `sync_engine/inventory.py` collector now queries NSX VM IDs, fabric VIF addresses and realized IP membership of configured groups. It writes an **access-restricted private inventory** and supports age-checked identity mapping in the offline importer. The inventory file contains real VM/IP information; it is **never** intended for the public repository.
+
+```bash
+python -m sync_engine.inventory \\
+  --config /etc/nsxcp/config.yaml \\
+  --output /secure/private/nsx-inventory-001
+
+python -m sync_engine.offline \\
+  --input /secure/private/nsx-infra-export.json \\
+  --inventory-file /secure/private/nsx-inventory-001/inventory.private.json \\
+  --max-inventory-age-seconds 600 \\
+  --output /secure/private/assessment
+```
+
+The collector rejects duplicate VM/IP ownership, missing VIF provenance, orphan interface references and group membership API errors. The importer rejects stale inventories. This is a **guarded assessment**: VM Tools address reporting can be stale, and effective group membership is not yet independently reconciled to a point-in-time policy snapshot. No live Check Point policy write, publish or install is supported.
+
+Read the [identity inventory and data-protection guide](docs/IDENTITY_INVENTORY.md).
+
 ## Capability and maturity
 
 | Capability | Status | Behaviour |
@@ -61,7 +81,8 @@ See the [offline import and group resolver guide](docs/OFFLINE_EXPORT_V1_2.md).
 | Offline candidate export | Implemented | Rule-level hash approval and topology evidence; rules disabled |
 | Periodic scheduling | Implemented | systemd service/timer, initially every 5 minutes |
 | Offline hierarchical Infra export importer | Implemented in v1.2 | UTF-8/UTF-16, Child* wrappers, pseudonymized reports; separate from online collector |
-| Conditional expression resolver | Implemented with safeguards | IPv4, AND/OR (homogeneous), path references, optional privately mapped workload IDs; not an inventory freshness guarantee |
+| Conditional expression resolver | Implemented with safeguards | IPv4, AND/OR (homogeneous), path references, optional privately mapped workload IDs |
+| NSX workload identity inventory | Read-only prototype | VM/VIF collection and effective group member query; private data with freshness checks, no complete membership attestation |
 | Check Point object/rule writes | Not implemented | No live staging |
 | Publish and install policy | Not implemented | No automatic enforcement |
 | Managed rollback / HA / drift remediation | Not implemented | Future work |
@@ -119,13 +140,15 @@ nxtcheckpoint/
 │   ├── ARQUITECTURA.md
 │   ├── MATRIZ_CONVERSAO.csv
 │   ├── OFFLINE_EXPORT_V1_2.md
+│   ├── IDENTITY_INVENTORY.md
 │   ├── AUTOMATIZACAO_CONVERSAO.md
 │   └── GO_NO_GO.md
 ├── examples/approvals.example.json
 └── tests/
     ├── test_model.py
     ├── test_offline.py
-    └── test_group_logic.py
+    ├── test_group_logic.py
+    └── test_inventory.py
 ```
 
 ## Quick start
@@ -339,7 +362,7 @@ Use least-privilege identities, trusted CAs, external secret management, audited
 |---|---|---|
 | **v1.1** | Expanded compatibility matrix; fail-closed guards for excluded groups, schedules and TCP inspection semantics | Documentation and partial guards committed; verification pending |
 | **v1.2** | Offline hierarchical JSON importer, static IPv4 and TCP/UDP compatibility checks, pseudonymized reports | Implemented as read-only assessment; complete object conversion/deduplication still planned |
-| **v1.3** | Group expression and nested reference resolver; verified identity mapping, freshness and drift controls | Partial: expression resolver committed; live identity refresh and drift controls not implemented |
+| **v1.3** | Group expression, NSX VM/VIF identity collection, freshness and dynamic membership controls | Partial: expression resolver and read-only inventory committed; live drift attestation, effective membership reconciliation and enforcement not implemented |
 | **v1.4** | DFW effective order, categories, direction, scope, topology and shadow analysis | Planned |
 | **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Planned |
 | **v1.6** | Authenticated approvals, publish/install separation, task tracking, HA tests, rollback and audit | Planned |
@@ -357,6 +380,7 @@ Use feature branches/PRs, synthetic test fixtures and tests for negative/unsuppo
 - [Detailed architecture](docs/ARQUITECTURA.md)
 - [Conversion matrix](docs/MATRIZ_CONVERSAO.csv)
 - [Offline hierarchical import (v1.2)](docs/OFFLINE_EXPORT_V1_2.md)
+- [Private NSX workload inventory](docs/IDENTITY_INVENTORY.md)
 - [Semantic conversion and automation design](docs/AUTOMATIZACAO_CONVERSAO.md)
 - [Go/No-Go checklist](docs/GO_NO_GO.md)
 
