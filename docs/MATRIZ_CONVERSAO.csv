@@ -1,0 +1,16 @@
+NSX element,Check Point destination,Conversion,Gate or required evidence
+Static IPv4 IP group,Host/Network/Group,Conditional,Ownership and overlap review
+Dynamic VM tag group,Dynamic object or integration,Not automatic,Membership refresh and consistency evidence
+L4 TCP/UDP service,TCP/UDP service,Conditional,Port and protocol equivalence
+L7/ALG service,Application Control or custom service,Not automatic,Feature availability and semantics
+DFW ALLOW,Access Rule Accept,Conditional,Gateway packet-path evidence
+DFW DROP/REJECT,Access Rule Drop/Reject,Conditional,Effective enforcement and precedence
+Source or destination ANY,Any,Conditional,Original DFW scope and exposure review
+Applied-To,Gateway and routing design,Not direct,Proof traffic traverses security gateway
+DFW category and sequence,Access layer and rule position,Conditional,Effective rule and shadowing validation
+Implicit connectivity rules,Explicit or implicit target rules,Not direct,Effective default policy comparison
+Logging per rule,Track Log,Conditional,Logging and SIEM mapping
+NSX NAT,Gateway NAT policy,Outside MVP,Routing and NAT design approval
+Edge Gateway Firewall,Access Rule,Outside MVP,Separate inventory and policy assessment
+Identity and tag policy,Identity Awareness or dynamic object,Not direct,Identity membership evidence
+IPv6,IPv6 objects,Outside MVP,Support and routing review
