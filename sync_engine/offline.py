@@ -9,6 +9,7 @@ import hashlib
 import ipaddress
 import json
 from pathlib import Path
+from .group_logic import resolve_group_expression, UnsafeExpression
 
 KINDS = ("SecurityPolicy", "Rule", "Group", "Service")
 
@@ -94,9 +95,19 @@ def service_compat(service):
     return "A", "l4_tcp_udp"
 
 
-def assess(root):
+def assess(root, identity_map=None):
     objects = unwrap(root)
-    groups = {g["path"]: group_compat(g) for g in objects["Group"] if g.get("path")}
+    group_objects = {g["path"]: g for g in objects["Group"] if g.get("path")}
+    groups = {}
+    for path, group in group_objects.items():
+        try:
+            resolved = resolve_group_expression(group, group_objects, identity_map)
+            label = "resolved_identity_or_path" if (
+                resolved.identity_dependencies or resolved.group_dependencies
+            ) else "static_ipv4"
+            groups[path] = ("A", label)
+        except UnsafeExpression as error:
+            groups[path] = ("C", error.code)
     services = {s["path"]: service_compat(s) for s in objects["Service"] if s.get("path")}
     reasons = collections.Counter()
     rows = []
@@ -183,8 +194,17 @@ def main():
     parser = argparse.ArgumentParser(description="Offline private NSX hierarchical export assessment")
     parser.add_argument("--input", required=True)
     parser.add_argument("--output", required=True)
+    parser.add_argument(
+        "--identity-map",
+        help="PRIVATE JSON mapping from workload IDs to verified IPv4 address lists; never commit",
+    )
     args = parser.parse_args()
-    write_report(assess(load_export(args.input)), args.output)
+    identity_map = None
+    if args.identity_map:
+        identity_map = json.loads(Path(args.identity_map).read_text(encoding="utf-8"))
+        if not isinstance(identity_map, dict):
+            parser.error("--identity-map must contain a JSON object")
+    write_report(assess(load_export(args.input), identity_map=identity_map), args.output)
     print("Sanitized assessment written: summary.json, rules.csv")
 
 
