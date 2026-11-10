@@ -10,6 +10,22 @@ NXTCheckpoint is a generic, environment-independent toolkit for organizations pl
 
 The intended lifecycle is **observe → compare → review → stage → enforce**. The current release supports only **observe, compare, review and offline candidate generation**.
 
+## v1.2: private offline NSX Infra export analysis
+
+The v1.2 offline import path accepts hierarchical NSX Infra exports (UTF-8/UTF-16 BOM), reconstructs policies/rules/groups/services from `Child*` wrappers, evaluates simple static IPv4 groups and TCP/UDP services, and produces **pseudonymized** compatibility reports. All unsupported semantics are blocked conservatively; the tool does **not** perform Check Point API writes.
+
+```bash
+python -m sync_engine.offline \\
+  --input /secure/private/nsx-infra-export.json \\
+  --output /secure/private/assessment
+```
+
+The output contains `summary.json` (counts and reason-code distributions) and `rules.csv` (SHA-256-derived reference fingerprints, compatibility classes and reasons). The report contains no original names or IP addresses, but its hashes remain pseudonymous and may be linkable to known paths. **Keep both input and output outside the public repository.**
+
+The importer was tested locally against a complex private NSX export **without uploading that export or its content to GitHub**. Public regression tests use synthetic names, reserved documentation address ranges and fake identifiers only. Rejection of a source rule can result from DFW scope, dual-stack protocol selection, security profile references, dynamic groups or uncertain stateful inspection semantics; this is a safety feature, not proof that migration is impossible.
+
+**Important integration boundary:** v1.2's offline export analyser is separate from the existing online API collector. It does not automatically create the online collector's `latest_plan.json` state or drive `candidate.py`. Read the [v1.2 offline import guide](docs/OFFLINE_EXPORT_V1_2.md) for precise capabilities and limitations.
+
 ## Capability and maturity
 
 | Capability | Status | Behaviour |
@@ -21,6 +37,7 @@ The intended lifecycle is **observe → compare → review → stage → enforce
 | Check Point Management API | Read-only | Login, access layer/rulebase inventory, logout |
 | Offline candidate export | Implemented | Rule-level hash approval and topology evidence; rules disabled |
 | Periodic scheduling | Implemented | systemd service/timer, initially every 5 minutes |
+| Offline hierarchical Infra export importer | Implemented in v1.2 | UTF-8/UTF-16, Child* wrappers, pseudonymized reports; separate from online collector |
 | Check Point object/rule writes | Not implemented | No live staging |
 | Publish and install policy | Not implemented | No automatic enforcement |
 | Managed rollback / HA / drift remediation | Not implemented | Future work |
@@ -77,10 +94,13 @@ nxtcheckpoint/
 ├── docs/
 │   ├── ARQUITECTURA.md
 │   ├── MATRIZ_CONVERSAO.csv
+│   ├── OFFLINE_EXPORT_V1_2.md
 │   ├── AUTOMATIZACAO_CONVERSAO.md
 │   └── GO_NO_GO.md
 ├── examples/approvals.example.json
-└── tests/test_model.py
+└── tests/
+    ├── test_model.py
+    └── test_offline.py
 ```
 
 ## Quick start
@@ -293,7 +313,7 @@ Use least-privilege identities, trusted CAs, external secret management, audited
 | Proposed milestone | Deliverable | Status |
 |---|---|---|
 | **v1.1** | Expanded compatibility matrix; fail-closed guards for excluded groups, schedules and TCP inspection semantics | Documentation and partial guards committed; verification pending |
-| **v1.2** | Complete static IPv4 host/network/range and L4 service normalization, object deduplication, negative tests | Planned |
+| **v1.2** | Offline hierarchical JSON importer, static IPv4 and TCP/UDP compatibility checks, pseudonymized reports | Implemented as read-only assessment; complete object conversion/deduplication still planned |
 | **v1.3** | Nested and dynamic group resolution, refresh policy, membership drift detection | Planned |
 | **v1.4** | DFW effective order, categories, direction, scope, topology and shadow analysis | Planned |
 | **v1.5** | Check Point object/rule staging writer with dedicated namespace, idempotent ownership and disabled candidate verification | Planned |
@@ -311,6 +331,7 @@ Use feature branches/PRs, synthetic test fixtures and tests for negative/unsuppo
 - [Check Point Management API](https://sc1.checkpoint.com/documents/latest/APIs/)
 - [Detailed architecture](docs/ARQUITECTURA.md)
 - [Conversion matrix](docs/MATRIZ_CONVERSAO.csv)
+- [Offline hierarchical import (v1.2)](docs/OFFLINE_EXPORT_V1_2.md)
 - [Semantic conversion and automation design](docs/AUTOMATIZACAO_CONVERSAO.md)
 - [Go/No-Go checklist](docs/GO_NO_GO.md)
 
