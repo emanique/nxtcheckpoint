@@ -75,6 +75,18 @@ def compile_snapshot(snapshot, max_rules=5000):
                 problems.append('Implicit connectivity semantics')
             if policy.get('stateful') is False:
                 problems.append('Stateless policy')
+            if policy.get('scheduler_path') or rule.get('scheduler_path'):
+                problems.append('Scheduled policy/rule requires time-object mapping')
+            if policy.get('tcp_strict') is not None:
+                problems.append('TCP strict semantics require state verification')
+            if rule.get('sources_excluded') or rule.get('destinations_excluded'):
+                problems.append('Negated source/destination requires explicit conversion')
+            if rule.get('source_groups_excluded') or rule.get('destination_groups_excluded'):
+                problems.append('Negated group semantics require explicit conversion')
+            if rule.get('source_groups_negated') or rule.get('destination_groups_negated'):
+                problems.append('Negated operand requires explicit conversion')
+            if rule.get('service_entries') or rule.get('service_profiles'):
+                problems.append('Additional service/profile semantics require review')
             if rule.get('disabled', False):
                 problems.append('Disabled rule')
             if rule.get('direction', 'IN_OUT') != 'IN_OUT':
